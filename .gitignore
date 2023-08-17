@@ -1,0 +1,28 @@
+# 依赖不入库
+node_modules
+
+# 增量编译文件
+**/tsconfig.tsbuildinfo
+
+## 编译产物不入库
+dist
+temp
+
+# vscode 工程文件不入库（默认工程文件除外）
+**/*.code-workspace
+!ffas.code-workspace
+
+# 导出文件不入库
+packages/client/src/generated
+packages/common/src/generated
+
+# packages 中 link 模块不入库（主游戏逻辑除外）
+packages/*
+!packages/client
+!packages/editor
+!packages/common
+!packages/logic-server
+!packages/battle-server
+
+# types 中 link 的模块不入库
+**/types

@@ -1,0 +1,36 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "name": "Launch Program",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "${workspaceFolder}\\src\\index.ts",
+            "outFiles": ["${workspaceFolder}/dist/*.js"],
+            "args": [
+                // "--expose-gc",
+                // "--max-old-space-size=8192",
+                // "--es-module-specifier-resolution=node",
+                "--source",
+                //"F:/code-zero/client/trunk/ResProject/Assets/StreamingAssets/LuaScripts/DataCenter/UserDataManager.lua",
+                // "F:/code-zero/client/trunk/ResProject/Assets/StreamingAssets/LuaScripts/Battle/BattleDataManager.lua",
+                // "F:\\code-zero\\client\\trunk\\ResProject\\Assets\\StreamingAssets\\LuaScripts\\UI\\HeroBag\\Control.lua",
+                // "F:\\code-zero\\client\\trunk\\ResProject\\Assets\\StreamingAssets\\LuaScripts\\UI\\HeroBag\\HeroBagHeroNode.lua",
+                "F:/code-zero/client/trunk/ResProject/Assets/StreamingAssets/LuaScripts/Start/GameMain.lua",
+                "--post-replace",
+                "Battle/Framework/Commom/StringUtil.js|string\\.|l2j.string_;Battle/Framework/Commom/TableUtil.js|table\\.|l2j.table_;Battle/Framework/Commom/IoUtil.js|io\\.|l2j.io_",
+                // "--dest",
+                // "F:/code-zero/client/trunk/ResProject/Assets/StreamingAssets/New/JS/test.js",
+                // "F:/code-zero/client/trunk/ResProject/Assets/StreamingAssets/LuaScripts"
+                // "--convert-dir",
+                "--dest",
+                "F:/code-zero/client/trunk/ResProject/Assets/Resources/JavaScript/Old"
+            ]
+        }
+    ]
+}
