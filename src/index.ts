@@ -42,7 +42,7 @@ function outputOthers(allGlobalVars: Set<string>, initedGlobalVars: Set<string>,
 async function convertFile(source: string, dest: string) {
     // console.log(`source: ${source}, dest: ${dest}`);
     let luaCode = await fs.readFile(source, { encoding: "utf-8" });
-    let jsCode = lua2js(luaCode, source);
+    let jsCode = lua2js(luaCode, source, false);
     await fs.writeFile(dest, jsCode, { encoding: "utf-8" });
 }
 

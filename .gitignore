@@ -26,3 +26,4 @@ packages/*
 
 # types 中 link 的模块不入库
 **/types
+output.log
