@@ -1,4 +1,4 @@
-import { lua2js, l2jSystemFuncs, l2jGlobalVars, l2jInitedGlobalVars } from "@xiangnanscu/lua2js";
+import { lua2js, l2jSystemFuncs, l2jGlobalVars, l2jInitedGlobalVars, lua2ast } from "@xiangnanscu/lua2js";
 import { program } from "commander";
 import fs from "fs-extra";
 import * as path from "path";
@@ -39,17 +39,31 @@ function outputOthers(allGlobalVars: Set<string>, initedGlobalVars: Set<string>,
     console.log(`noInitedGlobalVars: ${Array.from(noInited)}`);
 }
 
-async function convertFile(source: string, dest: string) {
+async function convertFile(source: string, dest: string, onlyExportGlobalVars: boolean = false) {
     // console.log(`source: ${source}, dest: ${dest}`);
     let luaCode = await fs.readFile(source, { encoding: "utf-8" });
-    let jsCode = lua2js(luaCode, source, false);
-    await fs.writeFile(dest, jsCode, { encoding: "utf-8" });
+    let output = "";
+    if (onlyExportGlobalVars) {
+        let vars = new Set<string>();
+        let ast = lua2ast(luaCode);
+        if (ast.globals?.length > 0) {
+            for (let v of ast.globals) vars.add(v.name);
+        }
+        output = JSON.stringify(Array.from(vars));
+    } else {
+        output = lua2js(luaCode, source, false);
+    }
+    await fs.writeFile(dest, output, { encoding: "utf-8" });
 }
 
 const ENABLE_TEST = false;
 function test() {
     let arr = new Array<any>();
-    arr.push(`local a = self.a +b`);
+    arr.push(`
+    function test(t)
+        local t = 1
+        local t = 2
+    end`);
     // arr.push(`a = {}`);
     // arr.push(`require('aaa)`)
     // arr.push(`function test()`);
@@ -73,7 +87,7 @@ function test() {
 
     let luaCode = "";
     arr.forEach((v) => (luaCode += v + "\n"));
-    let jsCode = lua2js(luaCode);
+    let jsCode = lua2js(luaCode, "./temp/test.js", false);
     console.log(jsCode);
 }
 
@@ -288,7 +302,8 @@ async function main() {
         .option("-d, --dest <path>")
         .option("--convert-dir")
         .option("-f, --file <path>", "convert a list of file")
-        .option("-r, --post-replace <path:from:to>", "post replace file");
+        .option("-r, --post-replace <path:from:to>", "post replace file")
+        .option("-g, --global-vars");
     program.parse();
     const options = program.opts();
 
@@ -300,7 +315,7 @@ async function main() {
         } else if (options.convertDir) {
             return await convertDirWithMultiExec(path.resolve(options.source), options.dest);
         } else {
-            await convertFile(options.source, options.dest);
+            await convertFile(options.source, options.dest, options.globalVars);
         }
     }
 
