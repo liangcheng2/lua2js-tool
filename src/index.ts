@@ -78,74 +78,11 @@ function test() {
     let arr = new Array<any>();
     arr.push(`
 local M = {}
-function M:test()
-    local function b(c, d)
-        return self.a
-    end
-    return b
-end
-
 function M:test2()
-    local b = function(c, d)
+    self.b = function(self, c, d)
         return self.a
     end
     return b
-end
-
-local function initDeflateConfig(self)
-    local rootIndices = CSDeflateConfigManager:GetIndices()
-    if (rootIndices == nil) then
-        return
-    end
-    local defalteConfigs = {}
-
-    local cacheIndex = function(indices, convertKeyFunc)
-        local count = indices:GetLength()
-        if (count == 0) then
-            return 0
-        end
-        for i = 0, count - 1 do
-            local configName = indices[i]
-            defalteConfigs[configName] = convertKeyFunc
-            self.file_indices[configName] = configName
-        end
-    end
-
-    cacheIndex(rootIndices.numberIndices, tonumber)
-    cacheIndex(rootIndices.stringIndices, tostring)
-    if (next(defalteConfigs) == nil) then
-        return
-    end
-end
-
--- 返回配置表信息  最基本的加载配置，不去做其他处理
-function M:baseGetCfgByName(key)
- initDeflateConfig(self)
-
-    if self.all_cfg[key] == nil then
-        local config_part_names = config_part_infos[key]
-        if not config_part_names then -- 判断是否有对应的分表
-            config_part_names = {key}
-        end
-
-        for _, config_part_name in ipairs(config_part_names) do
-            local find_cfg_keys = self:findCfgKeys(config_part_name)
-            if #find_cfg_keys > 0 then
-                for k, v in pairs(find_cfg_keys) do
-                    self:loadCfg(key, v[2])
-                end
-            else
-                self:loadCfg(key, config_part_name)
-            end
-        end
-    end
-
-    local cfg_tab = self.all_cfg[key]
-    if cfg_tab == nil then
-        Logger.logWarningAlways(key, " cfg not found , cfg name is : ")
-    end
-
-    return cfg_tab or {}
 end
     `);
     // arr.push(`a = {}`);

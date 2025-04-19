@@ -879,7 +879,26 @@ function verifyMultiReturnFunction(scopePrefix, vars, init) {
             break;
         }
     }
-    return `${scopePrefix}${vars} = ${init}`;
+
+    let ret;
+    if (scopePrefix.length === 0) {
+        ret = `${vars} = ${init}`;
+        // 如果是xxx.xxx = (xxx, xxx) = > { xxx } 的形式，那么改成xxx.constructor.prototype.xxx = function (xxx, xxx) { xxx }
+        // Match pattern: object.property = (params) => { body }
+        const arrowFunctionPattern = /^(\w+)\.(\w+)\s*=\s*\((.*?)\)\s*=>\s*(\{[\s\S]*\})$/;
+        if (arrowFunctionPattern.test(ret)) {
+            const match = ret.match(arrowFunctionPattern);
+            if (match) {
+                let [, objectName, methodName, params, functionBody] = match;
+                params = params.replace("self,", "").replace("this,", "");
+                ret = `${objectName}.constructor.prototype.${methodName} = function (${params}) ${functionBody}`;
+            }
+        }
+    } else {
+        ret = `${scopePrefix}${vars} = ${init}`;
+    }
+
+    return ret;
 }
 
 function ast2js(ast, joiner) {
@@ -1395,9 +1414,9 @@ function ast2jsImp(ast, joiner) {
                                 .map(ast2js)
                                 .join(", ")})`;
                         } else {
-                            return `${funcName.replaceAll("prototype.", "")}(thisArg${
-                                ast.arguments.length > 0 ? "," : ""
-                            }${ast.arguments.map(ast2js).join(", ")})`;
+                            let args = ast.arguments.map(ast2js).join(", ");
+                            if (args.startsWith("this,")) args = args.substring(5);
+                            return `${funcName.replaceAll("prototype.", "")}(${args})`;
                         }
                         // }
                     } else {

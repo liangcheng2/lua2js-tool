@@ -7,6 +7,7 @@ import * as luaMathSource from "@wowts/math";
 // import * as pbjs from "protobufjs";
 import { fileURLToPath, pathToFileURL } from "url";
 import path from "path";
+import fs from "fs";
 
 function copySource(source: any) {
     let ret = {};
@@ -39,9 +40,12 @@ let globalLib = {} as any;
 const EMPTY_PARAM = Symbol();
 
 // //////////////////////////////////////////////////////////////////////////////////////////////
+function isNode() {
+    return typeof process !== "undefined" && process.versions != null && process.versions.node != null;
+}
+
 function isCSObject(o: any) {
-    // return o?.constructor !== undefined && puer.$typeof(o.constructor) !== undefined;
-    return false;
+    return !isNode() && o?.constructor !== undefined && g.puer.$typeof(o.constructor) !== undefined;
 }
 
 function convertLuaTableToJsArray(t: any, convertedObjs = new Map<any, any>()) {
@@ -490,8 +494,12 @@ l2j.math.maxinteger = Number.MAX_SAFE_INTEGER;
 // io
 // 暂时禁了
 let io = {} as any;
-io.close = function () {
-    throw new Error("io.close not supported");
+io.close = function (file: any) {
+    if (file && file.close) {
+        file.close();
+    } else {
+        throw new Error("io.close not supported");
+    }
 };
 
 io.lines = function (...args: any[]) {
@@ -499,7 +507,21 @@ io.lines = function (...args: any[]) {
 };
 
 io.open = function (filename: string, mode?: string) {
-    throw new Error("io.open not supported");
+    if (isNode()) {
+        const dir = path.dirname(filename);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        const fd = fs.openSync(filename, mode ?? "w+");
+        return {
+            write: (data: string) => {
+                fs.writeSync(fd, data, null, "utf-8");
+            },
+            close: () => {
+                fs.closeSync(fd);
+            },
+        };
+    } else {
+        throw new Error("io.open not supported");
+    }
 };
 
 const CHECK_PATH = "LuaScripts";
@@ -565,8 +587,29 @@ l2j.os.exit = function () {
     throw new Error("os.exit");
 };
 
+const DATE_FORMAT_CONVERT_INFO = [
+    ["%y", "yy"],
+    ["%Y", "yyyy"],
+    ["%m", "mm"],
+    ["%M", "MM"],
+    ["%d", "dd"],
+    ["%H", "hh"],
+    ["%h", "hh"],
+    ["%S", "ss"],
+    ["%p", "a"],
+    ["%P", "A"],
+    ["%I", "hh"],
+    ["%%", "%"],
+];
+
 l2j.os.date = function (format: string, time?: number) {
-    return dateFormat(format, new Date(time ?? ""));
+    if (format) {
+        for (let i = 0; i < DATE_FORMAT_CONVERT_INFO.length; i++) {
+            let [luaFormat, jsFormat] = DATE_FORMAT_CONVERT_INFO[i];
+            format = format.replaceAll(luaFormat, jsFormat);
+        }
+    }
+    return dateFormat(format, new Date(time ?? Date.now()));
 };
 
 l2j.os.clock = function () {
@@ -938,9 +981,12 @@ l2j.ipairs = luaApi.ipairs;
 // };
 
 l2j.pairs = function (t: any): any[] {
+    if (!t) return [];
+
     const pairs = [];
     let v;
-    for (let k in t) {
+    let keys = Object.keys(t);
+    for (let k of keys) {
         v = t[k];
         if (v !== undefined) pairs.push([k, v]);
     }
