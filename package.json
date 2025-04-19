@@ -5,7 +5,11 @@
     "main": "dist/index.js",
     "type": "module",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "export-util-dist": "node . --source \"G:\\Work\\code-zero\\client\\trunk\\ResProject\\LuaScripts\\Util\" --dest \"E:\\Study\\Projects\\ts\\lua-to-js\\output\\src\" --convert-dir",
+        "run-output": "yarn --cwd \"E:\\Study\\Projects\\ts\\lua-to-js\\output\" run run-test",
+        "watch": "tsc --watch",
+        "build": "tsc -b",
+        "export-util": "yarn tsx ./src/index.ts --source \"file:///G:\\Work\\code-zero\\client\\trunk\\ResProject\\LuaScripts\\Util\" --dest \"file:///E:\\Study\\Projects\\ts\\lua-to-js\\lua2jsTool\\output\" --convert-dir"
     },
     "author": "",
     "license": "ISC",
@@ -13,10 +17,19 @@
         "@stdlib/string-base-format-interpolate": "^0.0.4",
         "@stdlib/string-base-format-tokenize": "^0.0.4",
         "@types/fs-extra": "^11.0.1",
-        "@xiangnanscu/lua2js": "link:../lua2js",
+        "@wowts/bit": "^1.0.0",
+        "@wowts/lua": "^1.6.0",
+        "@wowts/math": "^1.1.0",
+        "@wowts/string": "^1.1.1",
+        "@wowts/table": "^1.0.2",
         "commander": "^11.0.0",
+        "date-format": "^4.0.14",
         "fs-extra": "^11.1.1",
-        "pure-rand": "^6.0.2"
+        "luaparse": "^0.3.1",
+        "prettier": "^2.6.2",
+        "protobufjs": "^7.4.0",
+        "pure-rand": "^6.0.2",
+        "tsx": "^4.19.3"
     },
     "devDependencies": {
         "@types/node": "^20.4.9"

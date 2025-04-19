@@ -1,8 +1,25 @@
-import { lua2js, l2jSystemFuncs, l2jGlobalVars, l2jInitedGlobalVars, lua2ast } from "@xiangnanscu/lua2js";
+// import { lua2js, l2jSystemFuncs, l2jGlobalVars, l2jInitedGlobalVars, lua2ast } from "@xiangnanscu/lua2js";
 import { program } from "commander";
 import fs from "fs-extra";
 import * as path from "path";
 import * as child_process from "child_process";
+import { fileURLToPath, pathToFileURL } from "url";
+import { replaceContent } from "./postReplace.js";
+
+const __filename = fileURLToPath(import.meta.url);
+// const __filename = import.meta.url.replace("file:///", "");
+console.log(__filename);
+const __dirname = path.dirname(__filename);
+// let __dirname: any;
+
+// const lua2jsFile = require("lua2js.cjs") as any;
+// const lua2js = lua2jsFile.lua2js;
+// const l2jSystemFuncs = lua2jsFile.l2jSystemFuncs;
+// const l2jGlobalVars = lua2jsFile.l2jGlobalVars;
+// const l2jInitedGlobalVars = lua2jsFile.l2jInitedGlobalVars;
+// const lua2ast = lua2jsFile.lua2ast;
+let lua2js: any, l2jSystemFuncs: Set<string>, l2jGlobalVars: Set<string>, l2jInitedGlobalVars: Set<string>;
+let lua2ast: any;
 
 const PART_COUNT = 100;
 
@@ -60,10 +77,77 @@ const ENABLE_TEST = false;
 function test() {
     let arr = new Array<any>();
     arr.push(`
-    function test(t)
-        local t = 1
-        local t = 2
-    end`);
+local M = {}
+function M:test()
+    local function b(c, d)
+        return self.a
+    end
+    return b
+end
+
+function M:test2()
+    local b = function(c, d)
+        return self.a
+    end
+    return b
+end
+
+local function initDeflateConfig(self)
+    local rootIndices = CSDeflateConfigManager:GetIndices()
+    if (rootIndices == nil) then
+        return
+    end
+    local defalteConfigs = {}
+
+    local cacheIndex = function(indices, convertKeyFunc)
+        local count = indices:GetLength()
+        if (count == 0) then
+            return 0
+        end
+        for i = 0, count - 1 do
+            local configName = indices[i]
+            defalteConfigs[configName] = convertKeyFunc
+            self.file_indices[configName] = configName
+        end
+    end
+
+    cacheIndex(rootIndices.numberIndices, tonumber)
+    cacheIndex(rootIndices.stringIndices, tostring)
+    if (next(defalteConfigs) == nil) then
+        return
+    end
+end
+
+-- 返回配置表信息  最基本的加载配置，不去做其他处理
+function M:baseGetCfgByName(key)
+ initDeflateConfig(self)
+
+    if self.all_cfg[key] == nil then
+        local config_part_names = config_part_infos[key]
+        if not config_part_names then -- 判断是否有对应的分表
+            config_part_names = {key}
+        end
+
+        for _, config_part_name in ipairs(config_part_names) do
+            local find_cfg_keys = self:findCfgKeys(config_part_name)
+            if #find_cfg_keys > 0 then
+                for k, v in pairs(find_cfg_keys) do
+                    self:loadCfg(key, v[2])
+                end
+            else
+                self:loadCfg(key, config_part_name)
+            end
+        end
+    end
+
+    local cfg_tab = self.all_cfg[key]
+    if cfg_tab == nil then
+        Logger.logWarningAlways(key, " cfg not found , cfg name is : ")
+    end
+
+    return cfg_tab or {}
+end
+    `);
     // arr.push(`a = {}`);
     // arr.push(`require('aaa)`)
     // arr.push(`function test()`);
@@ -159,36 +243,40 @@ async function convertDir(source: string, dest: string) {
         let relativePath = path.dirname(path.relative(source, filePath));
         let jsPath = path.join(dest, relativePath, baseName + ".js");
 
-        promises.push(convertSingle(filePath, jsPath));
-        if (promises.length >= PART_COUNT) {
-            await Promise.all(promises);
-            processedCount += PART_COUNT;
-            promises = new Array<any>();
-            let oldTime = time;
-            time = Date.now();
+        console.log(`convert ${filePath} to ${jsPath}`);
+        await convertSingle(filePath, jsPath);
 
-            console.log(
-                `convert percentage: ${((processedCount / allFilePath.length) * 100).toFixed(
-                    2
-                )}%, file count: ${processedCount}/${allFilePath.length}, time: ${(
-                    (time - oldTime) /
-                    1000
-                ).toFixed()} s.`
-            );
-        }
+        // if (promises.length >= PART_COUNT) {
+        //     await Promise.all(promises);
+        //     processedCount += PART_COUNT;
+        //     promises = new Array<any>();
+        //     let oldTime = time;
+        //     time = Date.now();
+
+        //     console.log(
+        //         `convert percentage: ${((processedCount / allFilePath.length) * 100).toFixed(
+        //             2
+        //         )}%, file count: ${processedCount}/${allFilePath.length}, time: ${(
+        //             (time - oldTime) /
+        //             1000
+        //         ).toFixed()} s.`
+        //     );
+        // }
         // break;
     }
 
-    await Promise.all(promises);
+    // await Promise.all(promises);
     console.log(`convert done, total time: time: ${((Date.now() - startTime) / 1000).toFixed()} s.`);
 }
 
 async function convertDirWithMultiExec(source: string, dest: string) {
     let files = await walkParallelPromise(source);
 
-    if (!(await fs.exists(dest))) {
-        await fs.mkdir(dest, { recursive: true });
+    if (await fs.exists(dest)) {
+        await fs.rmdir(dest, { recursive: true });
     }
+    await fs.mkdir(dest, { recursive: true });
+    fs.copyFileSync(path.resolve(__dirname, "../src/lua2jsFunc.ts"), path.resolve(dest, "index.ts"));
 
     let tempFiles = new Array<string>();
     let fileList = new Map<string, number>();
@@ -231,7 +319,7 @@ async function convertDirWithMultiExec(source: string, dest: string) {
         // if (--testCount < 0) return;
 
         child_process.exec(
-            `node --expose-gc --max-old-space-size=8192 ./dist/index.js -s ${source} -d ${dest} -f ${file}`,
+            `node --expose-gc --max-old-space-size=12288 ./dist/index.js -s ${source} -d ${dest} -f ${file}`,
             (err, stdout, stderr) => {
                 if (err) {
                     console.error(err || stderr);
@@ -257,7 +345,9 @@ async function convertDirWithMultiExec(source: string, dest: string) {
                     console.log(stdout);
                 }
 
-                (globalThis as any).gc();
+                let g = globalThis as any;
+                if (g.gc) g.gc();
+
                 completedCount += count;
                 console.log(
                     `convert percentage: ${((completedCount / totalFileCount) * 100).toFixed(
@@ -287,6 +377,7 @@ async function convertWithFileList(filePath: string, source: string, dest: strin
     });
 
     await Promise.all(promises);
+    await replaceContent(dest);
 }
 
 async function replaceInFile(dest: string, filePath: string, from: any, to: any) {
@@ -294,6 +385,21 @@ async function replaceInFile(dest: string, filePath: string, from: any, to: any)
     let content = await fs.readFile(fullPath, "utf-8");
     content = content.replace(from, to);
     await fs.writeFile(fullPath, content);
+}
+
+async function verifyLua2js() {
+    let destPath = path.resolve(__dirname, "../dist/lua2js.cjs");
+    const lua2jsUrl = pathToFileURL(destPath).href;
+    const lua2jsFile = await import(lua2jsUrl);
+    lua2js = lua2jsFile.lua2js;
+    l2jSystemFuncs = lua2jsFile.l2jSystemFuncs;
+    l2jGlobalVars = lua2jsFile.l2jGlobalVars;
+    l2jInitedGlobalVars = lua2jsFile.l2jInitedGlobalVars;
+    lua2ast = lua2jsFile.lua2ast;
+    if (l2jSystemFuncs === undefined) {
+        console.error("lua2js is not loaded correctly, please check the path.");
+        process.exit(1);
+    }
 }
 
 async function main() {
@@ -306,6 +412,7 @@ async function main() {
         .option("-g, --global-vars");
     program.parse();
     const options = program.opts();
+    await verifyLua2js();
 
     if (ENABLE_TEST) {
         test();
@@ -313,12 +420,11 @@ async function main() {
         if (options.file) {
             await convertWithFileList(options.file, options.source, options.dest);
         } else if (options.convertDir) {
-            return await convertDirWithMultiExec(path.resolve(options.source), options.dest);
+            return await convertDirWithMultiExec(path.resolve(options.source), path.resolve(options.dest));
         } else {
             await convertFile(options.source, options.dest, options.globalVars);
         }
     }
-
     if (options.postReplace) {
         let arr = options.postReplace.split(";");
         for (let v of arr) {
@@ -326,8 +432,7 @@ async function main() {
             await replaceInFile(options.dest, args[0], new RegExp(args[1], "g"), args[2]);
         }
     }
-
     outputOthers(l2jGlobalVars, l2jInitedGlobalVars, l2jSystemFuncs);
 }
 
-await main();
+main();

@@ -14,6 +14,7 @@
         "incremental": true, // 增量编译
         "sourceMap": true,
         "experimentalDecorators": true, // 启用装饰器
+        "allowJs": true,
         "emitDecoratorMetadata": true // 为装饰器提供元数据的支持
     }
 }
